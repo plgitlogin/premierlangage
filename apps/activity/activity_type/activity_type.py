@@ -8,7 +8,7 @@ from django.urls import reverse
 
 
 class AbstractActivityType(ABC):
-    
+
     @abstractmethod
     def student_dashboard(self, request, activity, session):
         """
@@ -50,7 +50,7 @@ class AbstractActivityType(ABC):
         :return: A rendered template of the teacher dashboard
         """
         raise PermissionDenied()
-    
+
     @abstractmethod
     def template(self, request, activity, session):
         """
@@ -117,7 +117,7 @@ class AbstractActivityType(ABC):
         :return: A rendered template of the closed activity
         """
         raise PermissionDenied("Cette activité est fermée.")
-    
+
     @abstractmethod
     def navigation(self, activity, session_activity, request):
         """This method is called to get a rendered template of the navigation of this activity"""
@@ -129,3 +129,10 @@ class AbstractActivityType(ABC):
         response = HttpResponse("", content_type="text/csv")
         response['Content-Disposition'] = 'attachment;filename=notes.csv'
         return response
+
+    @abstractmethod
+    def computeStats(self, activity):
+        """
+        Compute stats  inside the activity.stat_data field
+        """
+        pass

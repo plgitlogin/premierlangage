@@ -7,6 +7,7 @@ from django.db.models import Q
 from django.http import Http404, HttpResponse, HttpResponseNotFound
 from django.shortcuts import redirect, render, reverse
 from django.template.loader import get_template
+from django.db.models.functions import Greatest
 
 from activity.activity_type.activity_type import AbstractActivityType
 from playexo.enums import State
@@ -15,6 +16,8 @@ from playexo.models import Answer, HighestGrade
 logger = logging.getLogger(__name__)
 
 
+from django.db.models import Max, Avg
+
 class Course(AbstractActivityType):
 
     def student_dashboard(self, request, activity, session):
@@ -22,6 +25,8 @@ class Course(AbstractActivityType):
         This method is called when the dashboard of an activity is requested for a student.
         :return: A rendered template of the student dashboard
         """
+        return self.student_summary(request.user.id, request, activity)
+        
         raise PermissionDenied()
 
     def teacher_dashboard(self, request, activity, session):
@@ -259,30 +264,61 @@ class Course(AbstractActivityType):
 
         if not activity.is_member(student):
             return HttpResponseNotFound("Cet étudiant ne fait pas partie de ce cours")
-
-        activities = activity.indexed_activities().filter(teacher=request.user)
+        activities = activity.indexed_activities().filter(student=request.user)
         tp = list()
+        nba=0
+        suma=0
+        avgsuma=0
         for a in activities:
             question = list()
+            mean=0
+            nb=0
+            sum=0
+            avgsum=0
             for pl in a.indexed_pl():
+                nb=nb+1
                 state = Answer.pl_state(pl, student)
+                # il faut un truc qui prend le greatest grade pour un filtre pl + user 
+                
+                g = Answer.objects.filter(pl=pl, user=student).aggregate(Max('grade'),Avg('grade'))
+                grade= g['grade__max']
+                avg = g['grade__avg']
+                if grade :
+                    sum = sum + int(grade) 
+                if avg :
+                    avgsum = avgsum + int(avg)
                 question.append({
                     'state': state,
-                    'name': pl.json['title'],
+                    'name':  pl.json['title'],
                 })
             len_tp = len(question) if len(question) else 1
             tp.append({
                 'name': a.activity_data['title'],
                 'activity_name': a.name,
-                'id': a.id,
-                'width': str(100 / len_tp),
-                'pl': question,
+                'id':            a.id,
+                'width':         str(100 / len_tp),
+                'pl':            question,
+                'mean': sum//nb, 
+                'avg': avgsum//nb,
             })
+            nba=nba+1
+            suma=suma+ sum//nb
+            avgsuma = avgsuma + avgsum//nb
 
         return render(request, 'activity/activity_type/course/student_summary.html', {
             'state': [i for i in State if i != State.ERROR],
             'course_name': activity.name,
-            'student': student,
-            'activities': tp,
-            'course_id': activity.id,
+
+            'student':     student,
+            'activities':  tp,
+            'mmean':suma//nba,
+            'avg': avgsuma//nba,
+            'course_id':   activity.id,
         })
+
+
+    def computeStats(self, activity):
+        """
+        Compute stats  inside the activity.stat_data field
+        """
+        pass
